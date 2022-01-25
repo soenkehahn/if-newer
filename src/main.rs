@@ -1,5 +1,6 @@
 use std::fs;
 use std::io;
+use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -23,8 +24,7 @@ impl From<io::Error> for AppError {
 
 fn run() -> Result<(), AppError> {
     let args = parse_args()?;
-    let input_modified = get_modified(&args.input)?
-        .ok_or_else(|| AppError(format!("file not found: {}", args.input.to_string_lossy())))?;
+    let input_modified = get_input_modified(&args)?;
     let should_run = match get_modified(&args.output)? {
         None => true,
         Some(output_modified) => output_modified < input_modified,
@@ -37,6 +37,33 @@ fn run() -> Result<(), AppError> {
     Ok(())
 }
 
+fn get_input_modified(args: &Args) -> Result<SystemTime, AppError> {
+    let mut stdin = String::new();
+    let input_files: Vec<&Path> = match args.input.as_str() {
+        "-" => {
+            std::io::stdin().read_to_string(&mut stdin)?;
+            stdin.split_whitespace().map(Path::new).collect()
+        }
+        _ => vec![Path::new(&args.input)],
+    };
+    let mut max_modified = None;
+    for input_file in input_files {
+        let modified = get_modified(input_file)?
+            .ok_or_else(|| AppError(format!("file not found: {}", input_file.to_string_lossy())))?;
+        match max_modified {
+            None => {
+                max_modified = Some(modified);
+            }
+            Some(max) => {
+                if modified > max {
+                    max_modified = Some(modified);
+                }
+            }
+        }
+    }
+    max_modified.ok_or_else(|| AppError("no input files given on stdin".to_owned()))
+}
+
 fn get_modified(path: &Path) -> Result<Option<SystemTime>, AppError> {
     Ok(match fs::metadata(path) {
         Ok(metadata) => Some(metadata.modified()?),
@@ -47,7 +74,7 @@ fn get_modified(path: &Path) -> Result<Option<SystemTime>, AppError> {
 
 #[derive(Debug)]
 struct Args {
-    input: PathBuf,
+    input: String,
     output: PathBuf,
     command: String,
     args: Vec<String>,
@@ -57,7 +84,7 @@ fn parse_args() -> Result<Args, AppError> {
     let args = std::env::args();
     let mut args = args.skip(1);
     Ok(Args {
-        input: PathBuf::from(args.next().unwrap()),
+        input: args.next().unwrap(),
         output: PathBuf::from(args.next().unwrap()),
         command: args
             .next()

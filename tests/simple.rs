@@ -99,6 +99,7 @@ fn simple() -> Result<()> {
     );
 
     it("runs the command when the input is newer than the output");
+    thread::sleep(Duration::from_millis(10));
     context.touch("input")?;
     assert_eq!(
         context.run("input", None),

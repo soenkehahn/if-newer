@@ -61,7 +61,7 @@ fn get_input_modified(args: &Args) -> Result<SystemTime, AppError> {
             }
         }
     }
-    max_modified.ok_or(AppError("no input files given on stdin".to_owned()))
+    max_modified.ok_or_else(|| AppError("no input files given on stdin".to_owned()))
 }
 
 fn get_modified(path: &Path) -> Result<Option<SystemTime>, AppError> {

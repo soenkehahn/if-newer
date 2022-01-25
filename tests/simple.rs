@@ -2,6 +2,8 @@ use anyhow::Result;
 use colored::Colorize;
 use cradle::prelude::*;
 use pretty_assertions::assert_eq;
+use std::thread;
+use std::time::Duration;
 use tempfile::TempDir;
 
 struct Context {
@@ -167,6 +169,7 @@ fn multiple_input_files() -> Result<()> {
 
     it("runs the command when the second output is newer");
     context.touch("output")?;
+    thread::sleep(Duration::from_millis(10));
     context.touch("input2")?;
     assert_eq!(
         context.run("-", Some("input1 input2")),

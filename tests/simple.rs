@@ -2,7 +2,6 @@ use anyhow::Result;
 use colored::Colorize;
 use cradle::prelude::*;
 use pretty_assertions::assert_eq;
-use std::path::PathBuf;
 use tempfile::TempDir;
 
 struct Context {
@@ -30,19 +29,21 @@ impl Context {
         Ok(Context { temp_dir })
     }
 
-    fn input(&self) -> PathBuf {
-        self.temp_dir.path().join("input")
+    fn touch(&self, path: &str) -> Result<()> {
+        ("touch", self.temp_dir.path().join(path)).run_result()?;
+        Ok(())
     }
 
-    fn output(&self) -> PathBuf {
-        self.temp_dir.path().join("output")
-    }
-
-    fn run(&self) -> Output {
+    fn run(&self, input: &str, stdin: Option<&str>) -> Output {
+        let stdin = match stdin {
+            None => vec![],
+            Some(stdin) => vec![Stdin(stdin)],
+        };
         let (StdoutTrimmed(stdout), Stderr(stderr), Status(status)) = (
             CurrentDir(self.temp_dir.path()),
+            stdin,
             executable_path::executable_path("if-newer"),
-            "input",
+            input,
             "output",
             "echo",
             "command ran",
@@ -67,7 +68,7 @@ fn simple() -> Result<()> {
 
     it("errors when the input file doesn't exist");
     assert_eq!(
-        context.run(),
+        context.run("input", None),
         Output {
             stderr: "ERROR: file not found: input\n".to_owned(),
             exit_code: 1,
@@ -76,9 +77,9 @@ fn simple() -> Result<()> {
     );
 
     it("runs the command when the output file doesn't exist");
-    ("touch", context.input()).run_result()?;
+    context.touch("input")?;
     assert_eq!(
-        context.run(),
+        context.run("input", None),
         Output {
             stdout: "command ran".to_owned(),
             ..def()
@@ -86,9 +87,9 @@ fn simple() -> Result<()> {
     );
 
     it("doesn't run the command when the output exists");
-    ("touch", context.output()).run_result()?;
+    context.touch("output")?;
     assert_eq!(
-        context.run(),
+        context.run("input", None),
         Output {
             stdout: "".to_owned(),
             ..def()
@@ -96,13 +97,85 @@ fn simple() -> Result<()> {
     );
 
     it("runs the command when the input is newer than the output");
-    ("touch", context.input()).run_result()?;
+    context.touch("input")?;
     assert_eq!(
-        context.run(),
+        context.run("input", None),
         Output {
             stdout: "command ran".to_owned(),
             ..def()
         }
     );
+
+    Ok(())
+}
+
+#[test]
+fn multiple_input_files() -> Result<()> {
+    let context = Context::new()?;
+
+    it("reads input files from stdin when '-' is given");
+    assert_eq!(
+        context.run("-", Some("input1 input2")),
+        Output {
+            stderr: "ERROR: file not found: input1\n".to_owned(),
+            exit_code: 1,
+            ..def()
+        }
+    );
+    context.touch("input1")?;
+    assert_eq!(
+        context.run("-", Some("input1 input2")),
+        Output {
+            stderr: "ERROR: file not found: input2\n".to_owned(),
+            exit_code: 1,
+            ..def()
+        }
+    );
+
+    it("runs the command when output doesn't exist");
+    context.touch("input2")?;
+    assert_eq!(
+        context.run("-", Some("input1 input2")),
+        Output {
+            stdout: "command ran".to_owned(),
+            exit_code: 0,
+            ..def()
+        }
+    );
+
+    it("doesn't run the command when output exists");
+    context.touch("output")?;
+    assert_eq!(
+        context.run("-", Some("input1 input2")),
+        Output {
+            stdout: "".to_owned(),
+            exit_code: 0,
+            ..def()
+        }
+    );
+
+    it("runs the command when the first output is newer");
+    context.touch("input1")?;
+    assert_eq!(
+        context.run("-", Some("input1 input2")),
+        Output {
+            stdout: "command ran".to_owned(),
+            exit_code: 0,
+            ..def()
+        }
+    );
+
+    it("runs the command when the second output is newer");
+    context.touch("output")?;
+    context.touch("input2")?;
+    assert_eq!(
+        context.run("-", Some("input1 input2")),
+        Output {
+            stdout: "command ran".to_owned(),
+            exit_code: 0,
+            ..def()
+        }
+    );
+
     Ok(())
 }

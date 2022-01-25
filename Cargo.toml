@@ -1,0 +1,10 @@
+[package]
+name = "if-newer"
+version = "0.0.0"
+edition = "2021"
+
+[dev-dependencies]
+anyhow = "*"
+cradle = "*"
+executable-path = "*"
+tempfile = "*"

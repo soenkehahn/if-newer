@@ -1,4 +1,5 @@
 use std::io;
+use std::path::PathBuf;
 use std::process::Command;
 
 fn main() {
@@ -7,6 +8,7 @@ fn main() {
     }
 }
 
+#[derive(Debug)]
 struct AppError(String);
 
 impl From<io::Error> for AppError {
@@ -17,22 +19,26 @@ impl From<io::Error> for AppError {
 
 fn run() -> Result<(), AppError> {
     let args = parse_args()?;
-    let mut command = Command::new(args.command);
-    command.args(args.args);
-    command.spawn()?.wait()?;
+    if !args.output.exists() {
+        let mut command = Command::new(args.command);
+        command.args(args.args);
+        command.spawn()?.wait()?;
+    }
     Ok(())
 }
 
 #[derive(Debug)]
 struct Args {
+    output: PathBuf,
     command: String,
     args: Vec<String>,
 }
 
 fn parse_args() -> Result<Args, AppError> {
     let args = std::env::args();
-    let mut args = args.skip(3);
+    let mut args = args.skip(2);
     Ok(Args {
+        output: PathBuf::from(args.next().unwrap()),
         command: args
             .next()
             .ok_or(AppError("not enough arguments provided".to_owned()))?,

@@ -1,6 +1,9 @@
+use std::fs;
 use std::io;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
+use std::time::SystemTime;
 
 fn main() {
     if let Err(error) = run() {
@@ -20,18 +23,26 @@ impl From<io::Error> for AppError {
 
 fn run() -> Result<(), AppError> {
     let args = parse_args()?;
-    if !args.input.exists() {
-        return Err(AppError(format!(
-            "file not found: {}",
-            args.input.to_string_lossy()
-        )));
-    }
-    if !args.output.exists() {
+    let input_modified = get_modified(&args.input)?
+        .ok_or_else(|| AppError(format!("file not found: {}", args.input.to_string_lossy())))?;
+    let should_run = match get_modified(&args.output)? {
+        None => true,
+        Some(output_modified) => output_modified < input_modified,
+    };
+    if should_run {
         let mut command = Command::new(args.command);
         command.args(args.args);
         command.spawn()?.wait()?;
     }
     Ok(())
+}
+
+fn get_modified(path: &Path) -> Result<Option<SystemTime>, AppError> {
+    Ok(match fs::metadata(path) {
+        Ok(metadata) => Some(metadata.modified()?),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+        Err(error) => return Err(error.into()),
+    })
 }
 
 #[derive(Debug)]
@@ -50,7 +61,7 @@ fn parse_args() -> Result<Args, AppError> {
         output: PathBuf::from(args.next().unwrap()),
         command: args
             .next()
-            .ok_or(AppError("not enough arguments provided".to_owned()))?,
+            .ok_or_else(|| AppError("not enough arguments provided".to_owned()))?,
         args: args.collect(),
     })
 }

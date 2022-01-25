@@ -99,7 +99,7 @@ fn simple() -> Result<()> {
     );
 
     it("runs the command when the input is newer than the output");
-    thread::sleep(Duration::from_millis(10));
+    thread::sleep(Duration::from_millis(30));
     context.touch("input")?;
     assert_eq!(
         context.run("input", None),
@@ -170,7 +170,7 @@ fn multiple_input_files() -> Result<()> {
 
     it("runs the command when the second output is newer");
     context.touch("output")?;
-    thread::sleep(Duration::from_millis(10));
+    thread::sleep(Duration::from_millis(30));
     context.touch("input2")?;
     assert_eq!(
         context.run("-", Some("input1 input2")),

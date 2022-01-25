@@ -1,4 +1,5 @@
 use anyhow::Result;
+use colored::Colorize;
 use cradle::prelude::*;
 use pretty_assertions::assert_eq;
 use std::path::PathBuf;
@@ -56,12 +57,14 @@ impl Context {
 }
 
 fn it(message: &str) {
-    eprintln!("it {}", message);
+    colored::control::set_override(true);
+    eprintln!("{}", format!("it {}", message).yellow());
 }
 
 #[test]
 fn simple() -> Result<()> {
     let context = Context::new()?;
+
     it("errors when the input file doesn't exist");
     assert_eq!(
         context.run(),
@@ -71,8 +74,9 @@ fn simple() -> Result<()> {
             ..def()
         }
     );
-    ("touch", context.input()).run_result()?;
+
     it("runs the command when the output file doesn't exist");
+    ("touch", context.input()).run_result()?;
     assert_eq!(
         context.run(),
         Output {
@@ -80,12 +84,23 @@ fn simple() -> Result<()> {
             ..def()
         }
     );
-    ("touch", context.output()).run_result()?;
+
     it("doesn't run the command when the output exists");
+    ("touch", context.output()).run_result()?;
     assert_eq!(
         context.run(),
         Output {
             stdout: "".to_owned(),
+            ..def()
+        }
+    );
+
+    it("runs the command when the input is newer than the output");
+    ("touch", context.input()).run_result()?;
+    assert_eq!(
+        context.run(),
+        Output {
+            stdout: "command ran".to_owned(),
             ..def()
         }
     );

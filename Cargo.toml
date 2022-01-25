@@ -5,6 +5,7 @@ edition = "2021"
 
 [dev-dependencies]
 anyhow = "*"
+colored = "*"
 cradle = "*"
 executable-path = "*"
 pretty_assertions = "*"

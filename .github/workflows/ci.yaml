@@ -11,6 +11,8 @@ on:
 jobs:
   all:
     runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: --deny warnings
     steps:
       - uses: actions/checkout@v2
       - name: Install Rust Toolchain Components
@@ -25,6 +27,6 @@ jobs:
       - name: Test
         run: cargo test
       - name: Clippy
-        run: cargo clippy
+        run: cargo clippy --tests
       - name: Check Formatting
         run: cargo fmt -- --check

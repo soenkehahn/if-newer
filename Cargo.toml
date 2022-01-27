@@ -2,6 +2,9 @@
 name = "if-newer"
 version = "0.0.0"
 edition = "2021"
+description = "runs commands when a file is newer than another"
+license = "MIT"
+repository = "https://github.com/soenkehahn/if-newer"
 
 [dev-dependencies]
 anyhow = "*"

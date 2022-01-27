@@ -1,3 +1,8 @@
+mod args;
+mod error;
+
+use crate::args::{parse_args, Args};
+use crate::error::AppError;
 use std::fs;
 use std::io;
 use std::io::Read;
@@ -13,31 +18,57 @@ fn main() {
     }
 }
 
-#[derive(Debug)]
-struct AppError(String);
-
-impl From<io::Error> for AppError {
-    fn from(error: io::Error) -> AppError {
-        AppError(format!("{}", error))
-    }
-}
-
 fn run() -> Result<(), AppError> {
     let args = parse_args()?;
-    let input_modified = get_input_modified(&args)?;
-    let should_run = match get_modified(&args.output)? {
-        None => true,
-        Some(output_modified) => output_modified < input_modified,
-    };
-    if should_run {
+    if should_run(&args)? {
         let mut command = Command::new(args.command);
         command.args(args.args);
         command.spawn()?.wait()?;
+    } else {
+        log(
+            &format!(
+                "{} is newer than all input files",
+                args.output.to_string_lossy(),
+            ),
+            false,
+            &args,
+        );
     }
     Ok(())
 }
 
-fn get_input_modified(args: &Args) -> Result<SystemTime, AppError> {
+fn should_run(args: &Args) -> Result<bool, AppError> {
+    let input_times = get_input_times(args)?;
+    match get_time(&args.output)? {
+        None => {
+            log(
+                &format!("{} not found", args.output.to_string_lossy(),),
+                true,
+                args,
+            );
+            Ok(true)
+        }
+        Some(output_time) => {
+            for (input, input_time) in input_times {
+                if output_time < input_time {
+                    log(
+                        &format!(
+                            "{} is newer than {}",
+                            input.to_string_lossy(),
+                            args.output.to_string_lossy(),
+                        ),
+                        true,
+                        args,
+                    );
+                    return Ok(true);
+                }
+            }
+            Ok(false)
+        }
+    }
+}
+
+fn get_input_times(args: &Args) -> Result<Vec<(PathBuf, SystemTime)>, AppError> {
     let mut stdin = String::new();
     let input_files: Vec<&Path> = match args.input.as_str() {
         "-" => {
@@ -46,25 +77,16 @@ fn get_input_modified(args: &Args) -> Result<SystemTime, AppError> {
         }
         _ => vec![Path::new(&args.input)],
     };
-    let mut max_modified = None;
+    let mut input_times: Vec<(PathBuf, SystemTime)> = Vec::new();
     for input_file in input_files {
-        let modified = get_modified(input_file)?
+        let modified = get_time(input_file)?
             .ok_or_else(|| AppError(format!("file not found: {}", input_file.to_string_lossy())))?;
-        match max_modified {
-            None => {
-                max_modified = Some(modified);
-            }
-            Some(max) => {
-                if modified > max {
-                    max_modified = Some(modified);
-                }
-            }
-        }
+        input_times.push((input_file.to_owned(), modified));
     }
-    max_modified.ok_or_else(|| AppError("no input files given on stdin".to_owned()))
+    Ok(input_times)
 }
 
-fn get_modified(path: &Path) -> Result<Option<SystemTime>, AppError> {
+fn get_time(path: &Path) -> Result<Option<SystemTime>, AppError> {
     Ok(match fs::metadata(path) {
         Ok(metadata) => Some(metadata.modified()?),
         Err(error) if error.kind() == io::ErrorKind::NotFound => None,
@@ -72,23 +94,12 @@ fn get_modified(path: &Path) -> Result<Option<SystemTime>, AppError> {
     })
 }
 
-#[derive(Debug)]
-struct Args {
-    input: String,
-    output: PathBuf,
-    command: String,
-    args: Vec<String>,
-}
-
-fn parse_args() -> Result<Args, AppError> {
-    let args = std::env::args();
-    let mut args = args.skip(1);
-    Ok(Args {
-        input: args.next().unwrap(),
-        output: PathBuf::from(args.next().unwrap()),
-        command: args
-            .next()
-            .ok_or_else(|| AppError("not enough arguments provided".to_owned()))?,
-        args: args.collect(),
-    })
+fn log(message: &str, should_run: bool, args: &Args) {
+    eprintln!(
+        "{},{}running: {} {}",
+        message,
+        if should_run { " " } else { " not " },
+        args.command,
+        args.args.join(" ")
+    );
 }

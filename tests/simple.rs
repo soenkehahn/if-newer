@@ -84,6 +84,7 @@ fn simple() -> Result<()> {
         context.run("input", None),
         Output {
             stdout: "command ran".to_owned(),
+            stderr: "output not found, running: echo command ran\n".to_owned(),
             ..def()
         }
     );
@@ -94,6 +95,8 @@ fn simple() -> Result<()> {
         context.run("input", None),
         Output {
             stdout: "".to_owned(),
+            stderr: "output is newer than all input files, not running: echo command ran\n"
+                .to_owned(),
             ..def()
         }
     );
@@ -105,6 +108,7 @@ fn simple() -> Result<()> {
         context.run("input", None),
         Output {
             stdout: "command ran".to_owned(),
+            stderr: "input is newer than output, running: echo command ran\n".to_owned(),
             ..def()
         }
     );
@@ -141,8 +145,8 @@ fn multiple_input_files() -> Result<()> {
         context.run("-", Some("input1 input2")),
         Output {
             stdout: "command ran".to_owned(),
+            stderr: "output not found, running: echo command ran\n".to_owned(),
             exit_code: 0,
-            ..def()
         }
     );
 
@@ -152,8 +156,9 @@ fn multiple_input_files() -> Result<()> {
         context.run("-", Some("input1 input2")),
         Output {
             stdout: "".to_owned(),
+            stderr: "output is newer than all input files, not running: echo command ran\n"
+                .to_owned(),
             exit_code: 0,
-            ..def()
         }
     );
 
@@ -163,8 +168,8 @@ fn multiple_input_files() -> Result<()> {
         context.run("-", Some("input1 input2")),
         Output {
             stdout: "command ran".to_owned(),
+            stderr: "input1 is newer than output, running: echo command ran\n".to_owned(),
             exit_code: 0,
-            ..def()
         }
     );
 
@@ -176,8 +181,8 @@ fn multiple_input_files() -> Result<()> {
         context.run("-", Some("input1 input2")),
         Output {
             stdout: "command ran".to_owned(),
+            stderr: "input2 is newer than output, running: echo command ran\n".to_owned(),
             exit_code: 0,
-            ..def()
         }
     );
 
